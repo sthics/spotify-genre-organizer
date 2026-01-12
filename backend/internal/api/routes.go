@@ -28,7 +28,7 @@ func SetupRoutes(r *gin.Engine) {
 			auth.POST("/logout", handlers.Logout)
 		}
 
-		api.POST("/organize", handlers.NotImplemented)
-		api.GET("/organize/:id", handlers.NotImplemented)
+		api.POST("/organize", handlers.StartOrganize)
+		api.GET("/organize/:id", handlers.GetOrganizeStatus)
 	}
 }
