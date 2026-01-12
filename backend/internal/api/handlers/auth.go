@@ -11,7 +11,14 @@ import (
 	"github.com/spotify-genre-organizer/backend/internal/spotify"
 )
 
-var spotifyConfig = spotify.NewConfig()
+var spotifyConfig *spotify.Config
+
+func getSpotifyConfig() *spotify.Config {
+	if spotifyConfig == nil {
+		spotifyConfig = spotify.NewConfig()
+	}
+	return spotifyConfig
+}
 
 func generateState() string {
 	bytes := make([]byte, 16)
@@ -22,7 +29,7 @@ func generateState() string {
 func Login(c *gin.Context) {
 	state := generateState()
 	c.SetCookie("oauth_state", state, 600, "/", "", false, true)
-	authURL := spotifyConfig.GetAuthURL(state)
+	authURL := getSpotifyConfig().GetAuthURL(state)
 	c.Redirect(http.StatusTemporaryRedirect, authURL)
 }
 
@@ -42,7 +49,7 @@ func Callback(c *gin.Context) {
 		return
 	}
 
-	tokens, err := spotifyConfig.ExchangeCode(code)
+	tokens, err := getSpotifyConfig().ExchangeCode(code)
 	if err != nil {
 		c.Redirect(http.StatusTemporaryRedirect, os.Getenv("FRONTEND_URL")+"?error=token_exchange_failed")
 		return

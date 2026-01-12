@@ -15,6 +15,14 @@ func main() {
 		log.Println("No .env file found, using environment variables")
 	}
 
+	// Debug: Check if Spotify credentials are loaded
+	clientID := os.Getenv("SPOTIFY_CLIENT_ID")
+	if clientID == "" {
+		log.Println("WARNING: SPOTIFY_CLIENT_ID is empty!")
+	} else {
+		log.Printf("Spotify Client ID loaded: %s...", clientID[:8])
+	}
+
 	if err := database.Init(); err != nil {
 		log.Printf("Warning: Could not connect to Supabase: %v", err)
 	}
