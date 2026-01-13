@@ -51,3 +51,23 @@ func TestGetParentGenres(t *testing.T) {
 		}
 	}
 }
+
+func TestGenrePriority(t *testing.T) {
+	// Reggae should come before Hip-Hop in priority
+	reggaeIdx := -1
+	hipHopIdx := -1
+	for i, g := range GenrePriority {
+		if g == "Reggae" {
+			reggaeIdx = i
+		}
+		if g == "Hip-Hop" {
+			hipHopIdx = i
+		}
+	}
+	if reggaeIdx == -1 || hipHopIdx == -1 {
+		t.Fatal("GenrePriority missing Reggae or Hip-Hop")
+	}
+	if reggaeIdx >= hipHopIdx {
+		t.Errorf("Reggae (idx %d) should come before Hip-Hop (idx %d)", reggaeIdx, hipHopIdx)
+	}
+}

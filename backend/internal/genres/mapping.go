@@ -8,6 +8,14 @@ var ParentGenres = []string{
 	"Indie", "Soul", "Funk", "World", "Other",
 }
 
+// GenrePriority defines tie-breaking order (earlier = higher priority)
+// More specific genres come before broader ones
+var GenrePriority = []string{
+	"Classical", "Jazz", "Blues", "Reggae", "Folk", "Country",
+	"Metal", "Punk", "Funk", "Soul", "R&B", "Latin", "World",
+	"Rock", "Electronic", "Hip-Hop", "Pop", "Indie", "Other",
+}
+
 var genreMapping = map[string]string{
 	// Rock
 	"rock": "Rock", "indie rock": "Rock", "alternative rock": "Rock",
