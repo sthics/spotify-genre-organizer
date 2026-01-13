@@ -138,3 +138,50 @@ func ConsolidateGenres(microGenres []string) []string {
 
 	return result
 }
+
+// ScoreGenres takes all artist genres and returns the best-fit parent genre
+// using weighted voting with priority-based tie-breaking
+func ScoreGenres(microGenres []string) string {
+	if len(microGenres) == 0 {
+		return "Other"
+	}
+
+	// Count votes for each parent genre
+	votes := make(map[string]int)
+	for _, g := range microGenres {
+		parent := ConsolidateGenre(g)
+		votes[parent]++
+	}
+
+	// Find max vote count
+	maxVotes := 0
+	for _, count := range votes {
+		if count > maxVotes {
+			maxVotes = count
+		}
+	}
+
+	// Collect all genres with max votes
+	var candidates []string
+	for genre, count := range votes {
+		if count == maxVotes {
+			candidates = append(candidates, genre)
+		}
+	}
+
+	// If single winner, return it
+	if len(candidates) == 1 {
+		return candidates[0]
+	}
+
+	// Break tie using priority order
+	for _, priorityGenre := range GenrePriority {
+		for _, candidate := range candidates {
+			if candidate == priorityGenre {
+				return candidate
+			}
+		}
+	}
+
+	return "Other"
+}

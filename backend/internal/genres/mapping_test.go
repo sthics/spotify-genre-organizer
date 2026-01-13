@@ -71,3 +71,46 @@ func TestGenrePriority(t *testing.T) {
 		t.Errorf("Reggae (idx %d) should come before Hip-Hop (idx %d)", reggaeIdx, hipHopIdx)
 	}
 }
+
+func TestScoreGenres(t *testing.T) {
+	tests := []struct {
+		name     string
+		genres   []string
+		expected string
+	}{
+		{
+			name:     "single genre",
+			genres:   []string{"rock"},
+			expected: "Rock",
+		},
+		{
+			name:     "dub should win over hip hop",
+			genres:   []string{"hip hop", "dub", "reggae"},
+			expected: "Reggae", // 2 votes vs 1
+		},
+		{
+			name:     "electronic wins with multiple matches",
+			genres:   []string{"dub", "trip hop", "downtempo", "acid jazz"},
+			expected: "Electronic", // trip hop + downtempo = 2 votes
+		},
+		{
+			name:     "tie broken by priority - reggae before hip-hop",
+			genres:   []string{"hip hop", "dub"},
+			expected: "Reggae", // 1-1 tie, reggae has priority
+		},
+		{
+			name:     "empty genres",
+			genres:   []string{},
+			expected: "Other",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ScoreGenres(tt.genres)
+			if result != tt.expected {
+				t.Errorf("ScoreGenres(%v) = %q, want %q", tt.genres, result, tt.expected)
+			}
+		})
+	}
+}
