@@ -144,3 +144,32 @@ func EnrichSongsWithGenres(songs []Song, artistGenres map[string][]string) {
 		}
 	}
 }
+
+// GetLikedSongsCount returns the total count of user's liked songs
+func GetLikedSongsCount(accessToken string) (int, error) {
+	req, err := http.NewRequest("GET", APIURL+"/me/tracks?limit=1", nil)
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("failed to get liked songs: %d", resp.StatusCode)
+	}
+
+	var result struct {
+		Total int `json:"total"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return 0, err
+	}
+
+	return result.Total, nil
+}

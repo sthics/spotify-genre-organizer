@@ -30,5 +30,7 @@ func SetupRoutes(r *gin.Engine) {
 
 		api.POST("/organize", handlers.StartOrganize)
 		api.GET("/organize/:id", handlers.GetOrganizeStatus)
+
+		api.GET("/library/count", handlers.GetLibraryCount)
 	}
 }
