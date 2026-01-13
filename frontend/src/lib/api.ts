@@ -60,3 +60,39 @@ export async function getLibraryCount(): Promise<{ count: number; cached_at: str
   }
   return response.json();
 }
+
+export interface UserSettings {
+  user_id: string;
+  name_template: string;
+  description_template: string;
+  is_premium: boolean;
+}
+
+export async function getSettings(): Promise<UserSettings> {
+  const response = await fetch(`${API_URL}/api/settings`, {
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch settings');
+  }
+  return response.json();
+}
+
+export async function updateSettings(
+  nameTemplate: string,
+  descriptionTemplate: string
+): Promise<UserSettings> {
+  const response = await fetch(`${API_URL}/api/settings`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name_template: nameTemplate,
+      description_template: descriptionTemplate,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to update settings');
+  }
+  return response.json();
+}
