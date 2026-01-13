@@ -35,5 +35,7 @@ func SetupRoutes(r *gin.Engine) {
 
 		api.GET("/settings", handlers.GetSettings)
 		api.PUT("/settings", handlers.UpdateSettings)
+
+		api.GET("/playlists", handlers.ListPlaylists)
 	}
 }

@@ -16,6 +16,28 @@ type Playlist struct {
 	TracksTotal int    `json:"tracks_total"`
 }
 
+type PlaylistsResponse struct {
+	Items []PlaylistItem `json:"items"`
+	Total int            `json:"total"`
+}
+
+type PlaylistItem struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	ExternalURLs struct {
+		Spotify string `json:"spotify"`
+	} `json:"external_urls"`
+	Images []struct {
+		URL string `json:"url"`
+	} `json:"images"`
+	Tracks struct {
+		Total int `json:"total"`
+	} `json:"tracks"`
+	Owner struct {
+		ID string `json:"id"`
+	} `json:"owner"`
+}
+
 type createPlaylistRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
@@ -190,6 +212,46 @@ func ClearPlaylist(accessToken, playlistID string) error {
 	resp.Body.Close()
 
 	return nil
+}
+
+func GetUserPlaylists(accessToken string) ([]PlaylistItem, error) {
+	var allPlaylists []PlaylistItem
+	offset := 0
+	limit := 50
+
+	for {
+		url := fmt.Sprintf("%s/me/playlists?limit=%d&offset=%d", APIURL, limit, offset)
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+
+		client := &http.Client{Timeout: 10 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("failed to get playlists: %d", resp.StatusCode)
+		}
+
+		var result PlaylistsResponse
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			return nil, err
+		}
+
+		allPlaylists = append(allPlaylists, result.Items...)
+
+		if len(result.Items) < limit {
+			break
+		}
+		offset += limit
+	}
+
+	return allPlaylists, nil
 }
 
 func FindExistingPlaylist(accessToken, playlistName string) (*Playlist, error) {
