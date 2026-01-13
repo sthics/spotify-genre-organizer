@@ -61,7 +61,7 @@ export default function Settings() {
     });
 
     return EXAMPLE_GENRES.map((genre) => {
-      let name = nameTemplate
+      const name = nameTemplate
         .replace(/{genre}/g, genre)
         .replace(/{username}/g, username)
         .replace(/{date}/g, date);
@@ -169,7 +169,7 @@ export default function Settings() {
 
           {/* Token Buttons */}
           <div className="flex flex-wrap gap-2 mb-3">
-            {TOKEN_BUTTONS.map(({ token, label, required }) => (
+            {TOKEN_BUTTONS.map(({ token, required }) => (
               <button
                 key={token}
                 onClick={() => insertToken(token, 'name')}
@@ -231,7 +231,7 @@ export default function Settings() {
 
           {/* Token Buttons */}
           <div className="flex flex-wrap gap-2 mb-3">
-            {TOKEN_BUTTONS.map(({ token, label }) => (
+            {TOKEN_BUTTONS.map(({ token }) => (
               <button
                 key={token}
                 onClick={() => insertToken(token, 'description')}
