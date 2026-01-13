@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { VinylIcon } from '@/components/VinylIcon';
 import { Button } from '@/components/Button';
 import { Slider } from '@/components/Slider';
 import { useUser } from '@/hooks/useUser';
-import { startOrganize, logout } from '@/lib/api';
+import { startOrganize, logout, getLibraryCount } from '@/lib/api';
+
+const LIBRARY_COUNT_CACHE_KEY = 'spotify_library_count';
 
 export default function Dashboard() {
   const { user, loading } = useUser();
@@ -14,9 +16,38 @@ export default function Dashboard() {
   const [playlistCount, setPlaylistCount] = useState(12);
   const [replaceExisting, setReplaceExisting] = useState(true);
   const [isOrganizing, setIsOrganizing] = useState(false);
+  const [likedSongsCount, setLikedSongsCount] = useState<number | null>(null);
+  const [countLoading, setCountLoading] = useState(true);
 
-  const likedSongsCount = 1247;
-  const songsPerPlaylist = Math.round(likedSongsCount / playlistCount);
+  useEffect(() => {
+    // Check localStorage first for instant display
+    const cached = localStorage.getItem(LIBRARY_COUNT_CACHE_KEY);
+    if (cached) {
+      try {
+        const { count } = JSON.parse(cached);
+        setLikedSongsCount(count);
+      } catch {
+        // Invalid cache, ignore
+      }
+    }
+
+    // Fetch fresh count from API
+    const fetchCount = async () => {
+      try {
+        const data = await getLibraryCount();
+        setLikedSongsCount(data.count);
+        localStorage.setItem(LIBRARY_COUNT_CACHE_KEY, JSON.stringify(data));
+      } catch (error) {
+        console.error('Failed to fetch library count:', error);
+      } finally {
+        setCountLoading(false);
+      }
+    };
+
+    fetchCount();
+  }, []);
+
+  const songsPerPlaylist = likedSongsCount ? Math.round(likedSongsCount / playlistCount) : 0;
 
   const handleOrganize = async () => {
     setIsOrganizing(true);
@@ -51,7 +82,13 @@ export default function Dashboard() {
             Hey, {user?.display_name?.split(' ')[0] || 'there'}.
           </h1>
           <p className="text-text-muted">
-            You&apos;ve got <span className="text-text-cream font-medium">{likedSongsCount.toLocaleString()}</span> liked songs.
+            You&apos;ve got{' '}
+            {countLoading && likedSongsCount === null ? (
+              <span className="inline-block w-16 h-5 bg-bg-card rounded animate-pulse align-middle" />
+            ) : (
+              <span className="text-text-cream font-medium">{(likedSongsCount ?? 0).toLocaleString()}</span>
+            )}{' '}
+            liked songs.
           </p>
         </div>
         <button

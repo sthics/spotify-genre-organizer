@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080';
 
 export async function fetchUser() {
   const res = await fetch(`${API_URL}/api/auth/me`, {
@@ -49,4 +49,14 @@ export async function logout() {
     method: 'POST',
     credentials: 'include',
   });
+}
+
+export async function getLibraryCount(): Promise<{ count: number; cached_at: string }> {
+  const response = await fetch(`${API_URL}/api/library/count`, {
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch library count');
+  }
+  return response.json();
 }
