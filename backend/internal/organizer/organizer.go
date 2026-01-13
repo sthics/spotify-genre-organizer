@@ -37,8 +37,8 @@ func OrganizeSongs(
 			continue
 		}
 
-		// Use the first consolidated genre
-		parentGenre := genres.ConsolidateGenre(song.Genres[0])
+		// Use weighted scoring across all genres
+		parentGenre := genres.ScoreGenres(song.Genres)
 		genreGroups[parentGenre] = append(genreGroups[parentGenre], song)
 	}
 
