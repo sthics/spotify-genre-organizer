@@ -6,27 +6,26 @@ import (
 )
 
 type UserSettings struct {
-	UserID              string    `json:"user_id"`
-	NameTemplate        string    `json:"name_template"`
-	DescriptionTemplate string    `json:"description_template"`
-	IsPremium           bool      `json:"is_premium"`
-	CreatedAt           time.Time `json:"created_at"`
-	UpdatedAt           time.Time `json:"updated_at"`
+	UserID              string    `json:"user_id" db:"user_id"`
+	NameTemplate        string    `json:"name_template" db:"name_template"`
+	DescriptionTemplate string    `json:"description_template" db:"description_template"`
+	IsPremium           bool      `json:"is_premium" db:"is_premium"`
+	CreatedAt           time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type PlaylistOverride struct {
-	ID                string     `json:"id"`
-	UserID            string     `json:"user_id"`
-	PlaylistSpotifyID string     `json:"playlist_spotify_id"`
-	CustomName        *string    `json:"custom_name"`
-	CustomDescription *string    `json:"custom_description"`
-	Genre             string     `json:"genre"`
-	LastSyncedAt      *time.Time `json:"last_synced_at"`
-	CreatedAt         time.Time  `json:"created_at"`
-	UpdatedAt         time.Time  `json:"updated_at"`
+	ID                string    `json:"id" db:"id"`
+	UserID            string    `json:"user_id" db:"user_id"`
+	PlaylistSpotifyID string    `json:"playlist_spotify_id" db:"playlist_spotify_id"`
+	CustomName        *string   `json:"custom_name" db:"custom_name"`
+	CustomDescription *string   `json:"custom_description" db:"custom_description"`
+	Genre             string    `json:"genre" db:"genre"`
+	LastSyncedAt      *time.Time `json:"last_synced_at" db:"last_synced_at"`
+	CreatedAt         time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at" db:"updated_at"`
 }
 
-// DefaultSettings returns default user settings
 func DefaultSettings(userID string) *UserSettings {
 	return &UserSettings{
 		UserID:              userID,
@@ -36,22 +35,18 @@ func DefaultSettings(userID string) *UserSettings {
 	}
 }
 
-// BuildPlaylistName applies template to generate playlist name
+// BuildPlaylistName replaces tokens in the template with actual values
 func (s *UserSettings) BuildPlaylistName(genre string) string {
-	return replaceTokens(s.NameTemplate, genre)
+	name := s.NameTemplate
+	name = strings.ReplaceAll(name, "{genre}", genre)
+	name = strings.ReplaceAll(name, "{year}", time.Now().Format("2006"))
+	return name
 }
 
-// BuildDescription applies template and appends footer for free users
+// BuildDescription replaces tokens in the description template
 func (s *UserSettings) BuildDescription(genre string) string {
-	desc := replaceTokens(s.DescriptionTemplate, genre)
-	if !s.IsPremium {
-		desc += " • spotifygenreorganizer.com"
-	}
+	desc := s.DescriptionTemplate
+	desc = strings.ReplaceAll(desc, "{genre}", genre)
+	desc = strings.ReplaceAll(desc, "{year}", time.Now().Format("2006"))
 	return desc
-}
-
-func replaceTokens(template, genre string) string {
-	result := template
-	result = strings.ReplaceAll(result, "{genre}", genre)
-	return result
 }

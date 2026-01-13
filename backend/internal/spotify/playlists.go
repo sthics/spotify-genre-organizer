@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 )
@@ -232,16 +233,20 @@ func GetUserPlaylists(accessToken string) ([]PlaylistItem, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
 			return nil, fmt.Errorf("failed to get playlists: %d", resp.StatusCode)
 		}
 
 		var result PlaylistsResponse
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			resp.Body.Close()
 			return nil, err
 		}
+		resp.Body.Close()
+
+		log.Printf("DEBUG: Spotify reports total=%d, got %d items at offset %d", result.Total, len(result.Items), offset)
 
 		allPlaylists = append(allPlaylists, result.Items...)
 
@@ -296,3 +301,67 @@ func FindExistingPlaylist(accessToken, playlistName string) (*Playlist, error) {
 
 	return nil, nil
 }
+
+// UpdatePlaylistDetails updates a playlist's name and/or description
+func UpdatePlaylistDetails(accessToken, playlistID, name, description string) error {
+	body := make(map[string]string)
+	if name != "" {
+		body["name"] = name
+	}
+	if description != "" {
+		body["description"] = description
+	}
+
+	if len(body) == 0 {
+		return nil // Nothing to update
+	}
+
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("PUT", APIURL+"/playlists/"+playlistID, bytes.NewReader(jsonBody))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to update playlist: %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// UnfollowPlaylist removes a playlist from the user's library (unfollows it)
+func UnfollowPlaylist(accessToken, playlistID string) error {
+	req, err := http.NewRequest("DELETE", APIURL+"/playlists/"+playlistID+"/followers", nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Spotify returns 200 or 204 on success
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("failed to unfollow playlist: %d", resp.StatusCode)
+	}
+	return nil
+}
+

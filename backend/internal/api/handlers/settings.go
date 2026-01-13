@@ -5,23 +5,22 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/spotify-genre-organizer/backend/internal/models"
+	"github.com/spotify-genre-organizer/backend/internal/database"
 )
 
-// In-memory storage for MVP (replace with database later)
-var userSettingsStore = make(map[string]*models.UserSettings)
-
 func GetSettings(c *gin.Context) {
+	// userID, _ := c.Cookie("user_id") // Should use authenticated user from middleware if available
+	// For now, getting from cookie is fine as per existing pattern
 	userID, err := c.Cookie("user_id")
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
 		return
 	}
 
-	settings, ok := userSettingsStore[userID]
-	if !ok {
-		// Return defaults if not found
-		settings = models.DefaultSettings(userID)
+	settings, err := database.GetUserSettings(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch settings"})
+		return
 	}
 
 	c.JSON(http.StatusOK, settings)
@@ -45,24 +44,25 @@ func UpdateSettings(c *gin.Context) {
 		return
 	}
 
-	// Validate templates contain {genre}
+	// Validate templates
 	if !strings.Contains(req.NameTemplate, "{genre}") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "name_template must contain {genre}"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Name template must contain {genre}"})
 		return
 	}
 
-	settings := &models.UserSettings{
-		UserID:              userID,
-		NameTemplate:        req.NameTemplate,
-		DescriptionTemplate: req.DescriptionTemplate,
+	settings, err := database.GetUserSettings(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch settings"})
+		return
 	}
 
-	// Check if user was previously premium
-	if existing, ok := userSettingsStore[userID]; ok {
-		settings.IsPremium = existing.IsPremium
-	}
+	settings.NameTemplate = req.NameTemplate
+	settings.DescriptionTemplate = req.DescriptionTemplate
 
-	userSettingsStore[userID] = settings
+	if err := database.SaveUserSettings(settings); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save settings"})
+		return
+	}
 
 	c.JSON(http.StatusOK, settings)
 }

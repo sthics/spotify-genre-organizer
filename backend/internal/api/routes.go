@@ -11,7 +11,7 @@ import (
 func SetupRoutes(r *gin.Engine) {
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{os.Getenv("FRONTEND_URL")},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		AllowCredentials: true,
 	}))
@@ -37,5 +37,8 @@ func SetupRoutes(r *gin.Engine) {
 		api.PUT("/settings", handlers.UpdateSettings)
 
 		api.GET("/playlists", handlers.ListPlaylists)
+		api.PATCH("/playlists/:id", handlers.UpdatePlaylist)
+		api.DELETE("/playlists/:id", handlers.DeletePlaylist)
+		api.POST("/playlists/:id/refresh", handlers.RefreshPlaylist)
 	}
 }

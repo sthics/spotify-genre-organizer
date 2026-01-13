@@ -1,9 +1,12 @@
 package organizer
 
 import (
+	"log"
 	"sort"
 
+	"github.com/spotify-genre-organizer/backend/internal/database"
 	"github.com/spotify-genre-organizer/backend/internal/genres"
+	"github.com/spotify-genre-organizer/backend/internal/models"
 	"github.com/spotify-genre-organizer/backend/internal/spotify"
 )
 
@@ -29,6 +32,13 @@ func OrganizeSongs(
 	replaceExisting bool,
 	progress ProgressCallback,
 ) (*OrganizeResult, error) {
+	// Fetch user settings
+	settings, err := database.GetUserSettings(userID)
+	if err != nil {
+		log.Printf("Failed to fetch settings for user %s: %v", userID, err)
+		settings = models.DefaultSettings(userID)
+	}
+
 	// Group songs by parent genre
 	genreGroups := make(map[string][]spotify.Song)
 	for _, song := range songs {
@@ -74,7 +84,9 @@ func OrganizeSongs(
 			progress("creating", i+1, total)
 		}
 
-		playlistName := spotify.BuildPlaylistName(gc.genre)
+		// Create or Update Playlist
+		playlistName := settings.BuildPlaylistName(gc.genre)
+		playlistDescription := settings.BuildDescription(gc.genre)
 		songs := genreGroups[gc.genre]
 
 		var playlist *spotify.Playlist
@@ -101,7 +113,7 @@ func OrganizeSongs(
 				accessToken,
 				userID,
 				playlistName,
-				"Organized by Spotify Genre Organizer",
+				playlistDescription,
 			)
 			if err != nil {
 				return nil, err
