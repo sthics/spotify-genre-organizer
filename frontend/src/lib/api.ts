@@ -96,3 +96,60 @@ export async function updateSettings(
   }
   return response.json();
 }
+
+export interface ManagedPlaylist {
+  spotify_id: string;
+  name: string;
+  genre: string;
+  song_count: number;
+  spotify_url: string;
+  image_url?: string;
+  custom_name?: string;
+  custom_description?: string;
+  last_synced?: string;
+}
+
+export async function getPlaylists(): Promise<{
+  playlists: ManagedPlaylist[];
+  total_songs: number;
+}> {
+  const response = await fetch(`${API_URL}/api/playlists`, {
+    credentials: 'include',
+  });
+  if (!response.ok) throw new Error('Failed to fetch playlists');
+  return response.json();
+}
+
+export async function refreshPlaylist(id: string): Promise<{ song_count: number }> {
+  const response = await fetch(`${API_URL}/api/playlists/${id}/refresh`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  if (!response.ok) throw new Error('Failed to refresh playlist');
+  return response.json();
+}
+
+export async function updatePlaylist(
+  id: string,
+  customName?: string,
+  customDescription?: string
+): Promise<void> {
+  const response = await fetch(`${API_URL}/api/playlists/${id}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      custom_name: customName,
+      custom_description: customDescription,
+    }),
+  });
+  if (!response.ok) throw new Error('Failed to update playlist');
+}
+
+export async function deletePlaylist(id: string): Promise<void> {
+  const response = await fetch(`${API_URL}/api/playlists/${id}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+  if (!response.ok) throw new Error('Failed to delete playlist');
+}
