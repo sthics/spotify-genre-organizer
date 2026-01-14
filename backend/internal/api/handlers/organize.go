@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"sync"
 
@@ -89,8 +90,9 @@ func processOrganizeJob(job *JobStatus, accessToken, userID string, req Organize
 		updateJob()
 	})
 	if err != nil {
+		log.Printf("organize job %s: failed to fetch songs: %v", job.ID, err)
 		job.Status = "failed"
-		job.Error = err.Error()
+		job.Error = "Failed to fetch your liked songs. Please try again."
 		updateJob()
 		return
 	}
@@ -101,8 +103,9 @@ func processOrganizeJob(job *JobStatus, accessToken, userID string, req Organize
 	// Fetch artist genres
 	artistGenres, err := spotify.FetchAllArtistGenres(accessToken, songs, nil)
 	if err != nil {
+		log.Printf("organize job %s: failed to fetch artist genres: %v", job.ID, err)
 		job.Status = "failed"
-		job.Error = err.Error()
+		job.Error = "Failed to analyze song genres. Please try again."
 		updateJob()
 		return
 	}
@@ -139,8 +142,9 @@ func processOrganizeJob(job *JobStatus, accessToken, userID string, req Organize
 		},
 	)
 	if err != nil {
+		log.Printf("organize job %s: failed to create playlists: %v", job.ID, err)
 		job.Status = "failed"
-		job.Error = err.Error()
+		job.Error = "Failed to create playlists. Please try again."
 		updateJob()
 		return
 	}

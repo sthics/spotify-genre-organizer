@@ -44,6 +44,16 @@ func UpdateSettings(c *gin.Context) {
 		return
 	}
 
+	// Validate input lengths to prevent abuse
+	if len(req.NameTemplate) > 200 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Name template must be 200 characters or less"})
+		return
+	}
+	if len(req.DescriptionTemplate) > 500 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Description template must be 500 characters or less"})
+		return
+	}
+
 	// Validate templates
 	if !strings.Contains(req.NameTemplate, "{genre}") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Name template must contain {genre}"})

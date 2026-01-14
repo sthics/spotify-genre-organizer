@@ -26,9 +26,13 @@ func generateState() string {
 	return hex.EncodeToString(bytes)
 }
 
+func isProduction() bool {
+	return os.Getenv("ENV") == "production"
+}
+
 func Login(c *gin.Context) {
 	state := generateState()
-	c.SetCookie("oauth_state", state, 600, "/", "", false, true)
+	c.SetCookie("oauth_state", state, 600, "/", "", isProduction(), true)
 	authURL := getSpotifyConfig().GetAuthURL(state)
 	c.Redirect(http.StatusTemporaryRedirect, authURL)
 }
@@ -62,8 +66,9 @@ func Callback(c *gin.Context) {
 	}
 
 	expiresAt := time.Now().Add(time.Duration(tokens.ExpiresIn) * time.Second)
-	c.SetCookie("user_id", profile.ID, tokens.ExpiresIn, "/", "", false, true)
-	c.SetCookie("access_token", tokens.AccessToken, tokens.ExpiresIn, "/", "", false, true)
+	secure := isProduction()
+	c.SetCookie("user_id", profile.ID, tokens.ExpiresIn, "/", "", secure, true)
+	c.SetCookie("access_token", tokens.AccessToken, tokens.ExpiresIn, "/", "", secure, true)
 	_ = expiresAt
 
 	c.Redirect(http.StatusTemporaryRedirect, os.Getenv("FRONTEND_URL")+"/dashboard")
@@ -90,8 +95,9 @@ func Me(c *gin.Context) {
 }
 
 func Logout(c *gin.Context) {
-	c.SetCookie("user_id", "", -1, "/", "", false, true)
-	c.SetCookie("access_token", "", -1, "/", "", false, true)
-	c.SetCookie("oauth_state", "", -1, "/", "", false, true)
+	secure := isProduction()
+	c.SetCookie("user_id", "", -1, "/", "", secure, true)
+	c.SetCookie("access_token", "", -1, "/", "", secure, true)
+	c.SetCookie("oauth_state", "", -1, "/", "", secure, true)
 	c.JSON(http.StatusOK, gin.H{"message": "logged out"})
 }

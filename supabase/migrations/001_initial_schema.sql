@@ -46,11 +46,20 @@ ALTER TABLE organize_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE genre_mappings ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies (service role bypasses these)
+-- Users can only view their own data
 CREATE POLICY "Users can view own data" ON users
-  FOR SELECT USING (true);
+  FOR SELECT USING (spotify_id = current_setting('app.user_id', true));
 
+CREATE POLICY "Users can update own data" ON users
+  FOR UPDATE USING (spotify_id = current_setting('app.user_id', true));
+
+-- Users can only view their own jobs
 CREATE POLICY "Users can view own jobs" ON organize_jobs
-  FOR SELECT USING (true);
+  FOR SELECT USING (user_id = (SELECT id FROM users WHERE spotify_id = current_setting('app.user_id', true)));
 
+CREATE POLICY "Users can insert own jobs" ON organize_jobs
+  FOR INSERT WITH CHECK (user_id = (SELECT id FROM users WHERE spotify_id = current_setting('app.user_id', true)));
+
+-- Genre mappings are public read-only
 CREATE POLICY "Anyone can read genre mappings" ON genre_mappings
   FOR SELECT USING (true);
