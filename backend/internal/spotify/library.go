@@ -4,15 +4,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 )
 
 type Song struct {
-	ID      string   `json:"id"`
-	Name    string   `json:"name"`
-	Artists []Artist `json:"artists"`
-	Genres  []string `json:"genres"`
+	ID      string    `json:"id"`
+	Name    string    `json:"name"`
+	Artists []Artist  `json:"artists"`
+	Genres  []string  `json:"genres"`
+	AddedAt time.Time `json:"added_at"`
 }
 
 type Artist struct {
@@ -23,7 +25,8 @@ type Artist struct {
 
 type likedSongsResponse struct {
 	Items []struct {
-		Track struct {
+		AddedAt string `json:"added_at"`
+		Track   struct {
 			ID      string `json:"id"`
 			Name    string `json:"name"`
 			Artists []struct {
@@ -51,10 +54,20 @@ func ParseLikedSongsResponse(data []byte) ([]Song, int, string, error) {
 				Name: a.Name,
 			}
 		}
+
+		// Parse added_at timestamp - use current time as fallback to avoid
+		// zero-time causing incorrect "new song" detection
+		addedAt, err := time.Parse(time.RFC3339, item.AddedAt)
+		if err != nil {
+			log.Printf("Warning: failed to parse added_at for track %s: %v", item.Track.ID, err)
+			addedAt = time.Now() // Fallback: treat as recently added
+		}
+
 		songs[i] = Song{
 			ID:      item.Track.ID,
 			Name:    item.Track.Name,
 			Artists: artists,
+			AddedAt: addedAt,
 		}
 	}
 
