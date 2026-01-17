@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/spotify-genre-organizer/backend/internal/models"
+	"github.com/supabase-community/postgrest-go"
 )
 
 // GetUserSettings fetches settings for a user, returning defaults if not found
@@ -74,4 +75,32 @@ func SavePlaylistOverride(override *models.PlaylistOverride) error {
 		Execute()
 
 	return err
+}
+
+// GetOldestSyncTimestamp returns the oldest last_synced_at from user's playlist overrides
+func GetOldestSyncTimestamp(userID string) (*time.Time, error) {
+	res, _, err := Client.From("playlist_overrides").
+		Select("last_synced_at", "", false).
+		Eq("user_id", userID).
+		Not("last_synced_at", "is", "null").
+		Order("last_synced_at", &postgrest.OrderOpts{Ascending: true}).
+		Limit(1, "").
+		Execute()
+
+	if err != nil {
+		return nil, err
+	}
+
+	var results []struct {
+		LastSyncedAt *time.Time `json:"last_synced_at"`
+	}
+	if err := json.Unmarshal(res, &results); err != nil {
+		return nil, err
+	}
+
+	if len(results) == 0 || results[0].LastSyncedAt == nil {
+		return nil, nil
+	}
+
+	return results[0].LastSyncedAt, nil
 }
