@@ -153,3 +153,57 @@ export async function deletePlaylist(id: string): Promise<void> {
   });
   if (!response.ok) throw new Error('Failed to delete playlist');
 }
+
+export interface PlaylistSyncStatus {
+  spotify_id: string;
+  genre: string;
+  new_count: number;
+}
+
+export interface SyncStatus {
+  new_songs_count: number;
+  oldest_sync_at: string | null;
+  playlists: PlaylistSyncStatus[];
+}
+
+export interface SyncAllResult {
+  playlists_updated: number;
+  total_songs: number;
+  failed_playlists?: string[];
+}
+
+// Custom error class for API errors with status codes
+export class ApiError extends Error {
+  constructor(message: string, public status: number) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+function handleApiResponse(response: Response): void {
+  if (response.status === 401) {
+    // Token expired - redirect to login
+    window.location.href = '/';
+    throw new ApiError('Session expired', 401);
+  }
+  if (!response.ok) {
+    throw new ApiError(`Request failed: ${response.statusText}`, response.status);
+  }
+}
+
+export async function getSyncStatus(): Promise<SyncStatus> {
+  const response = await fetch(`${API_URL}/api/library/sync-status`, {
+    credentials: 'include',
+  });
+  handleApiResponse(response);
+  return response.json();
+}
+
+export async function syncAllPlaylists(): Promise<SyncAllResult> {
+  const response = await fetch(`${API_URL}/api/playlists/sync-all`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  handleApiResponse(response);
+  return response.json();
+}
