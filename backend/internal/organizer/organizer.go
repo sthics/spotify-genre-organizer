@@ -3,6 +3,7 @@ package organizer
 import (
 	"log"
 	"sort"
+	"time"
 
 	"github.com/spotify-genre-organizer/backend/internal/database"
 	"github.com/spotify-genre-organizer/backend/internal/genres"
@@ -128,6 +129,19 @@ func OrganizeSongs(
 
 		if err := spotify.AddTracksToPlaylist(accessToken, playlist.ID, trackIDs); err != nil {
 			return nil, err
+		}
+
+		// Save playlist override with last_synced_at for sync tracking
+		now := time.Now()
+		override := &models.PlaylistOverride{
+			UserID:            userID,
+			PlaylistSpotifyID: playlist.ID,
+			Genre:             gc.genre,
+			LastSyncedAt:      &now,
+		}
+		if err := database.SavePlaylistOverride(override); err != nil {
+			log.Printf("Failed to save playlist override for %s: %v", playlist.ID, err)
+			// Don't fail the whole operation for this
 		}
 
 		results = append(results, PlaylistResult{
