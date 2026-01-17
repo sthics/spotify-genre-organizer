@@ -91,8 +91,13 @@ func SetupRoutes(r *gin.Engine) {
 	limiter := newRateLimiter(100, time.Minute)
 	r.Use(rateLimitMiddleware(limiter))
 
+	frontendURL := os.Getenv("FRONTEND_URL")
+	if frontendURL == "" {
+		frontendURL = "http://localhost:3000" // Default to Vite dev server
+	}
+
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{os.Getenv("FRONTEND_URL")},
+		AllowOrigins:     []string{frontendURL},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		AllowCredentials: true,
@@ -122,5 +127,8 @@ func SetupRoutes(r *gin.Engine) {
 		api.PATCH("/playlists/:id", handlers.UpdatePlaylist)
 		api.DELETE("/playlists/:id", handlers.DeletePlaylist)
 		api.POST("/playlists/:id/refresh", handlers.RefreshPlaylist)
+
+		api.GET("/library/sync-status", handlers.GetSyncStatus)
+		api.POST("/playlists/sync-all", handlers.SyncAllPlaylists)
 	}
 }
