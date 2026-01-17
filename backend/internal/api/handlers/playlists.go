@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spotify-genre-organizer/backend/internal/database"
@@ -349,6 +350,11 @@ func RefreshPlaylist(c *gin.Context) {
 			return
 		}
 	}
+
+	// Update last_synced_at
+	now := time.Now()
+	override.LastSyncedAt = &now
+	savePlaylistOverride(override)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success":    true,
