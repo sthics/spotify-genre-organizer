@@ -121,3 +121,97 @@ func GetSyncStatus(c *gin.Context) {
 		Playlists:     playlistStatuses,
 	})
 }
+
+type SyncAllResponse struct {
+	PlaylistsUpdated int      `json:"playlists_updated"`
+	TotalSongs       int      `json:"total_songs"`
+	FailedPlaylists  []string `json:"failed_playlists,omitempty"`
+}
+
+func SyncAllPlaylists(c *gin.Context) {
+	accessToken, err := c.Cookie("access_token")
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+
+	userID, err := c.Cookie("user_id")
+	if err != nil || userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+
+	// Fetch all liked songs
+	songs, err := spotify.FetchAllLikedSongs(accessToken, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch songs"})
+		return
+	}
+
+	// Enrich with genres
+	artistGenres, err := spotify.FetchAllArtistGenres(accessToken, songs, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch genres"})
+		return
+	}
+	spotify.EnrichSongsWithGenres(songs, artistGenres)
+
+	// Group songs by genre
+	songsByGenre := make(map[string][]spotify.Song)
+	for _, song := range songs {
+		genre := genres.ScoreGenres(song.Genres)
+		songsByGenre[genre] = append(songsByGenre[genre], song)
+	}
+
+	// Get user's playlist overrides
+	overrides, err := database.GetPlaylistOverrides(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get playlists"})
+		return
+	}
+
+	playlistsUpdated := 0
+	totalSongs := 0
+	var failedPlaylists []string
+	now := time.Now()
+
+	for playlistID, override := range overrides {
+		if override.Genre == "" {
+			continue
+		}
+
+		genreSongs := songsByGenre[override.Genre]
+		if len(genreSongs) == 0 {
+			continue
+		}
+
+		// Clear and repopulate playlist
+		if err := spotify.ClearPlaylist(accessToken, playlistID); err != nil {
+			failedPlaylists = append(failedPlaylists, override.Genre)
+			continue
+		}
+
+		trackIDs := make([]string, len(genreSongs))
+		for i, s := range genreSongs {
+			trackIDs[i] = s.ID
+		}
+
+		if err := spotify.AddTracksToPlaylist(accessToken, playlistID, trackIDs); err != nil {
+			failedPlaylists = append(failedPlaylists, override.Genre)
+			continue
+		}
+
+		// Update last_synced_at
+		override.LastSyncedAt = &now
+		database.SavePlaylistOverride(override)
+
+		playlistsUpdated++
+		totalSongs += len(genreSongs)
+	}
+
+	c.JSON(http.StatusOK, SyncAllResponse{
+		PlaylistsUpdated: playlistsUpdated,
+		TotalSongs:       totalSongs,
+		FailedPlaylists:  failedPlaylists,
+	})
+}
