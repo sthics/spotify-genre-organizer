@@ -4,12 +4,17 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { VinylIcon } from '@/components/VinylIcon';
 import { Button } from '@/components/Button';
+import { useToast } from '@/contexts/ToastContext';
 import {
     getPlaylists,
     refreshPlaylist,
     updatePlaylist,
     deletePlaylist,
+    getSyncStatus,
+    syncAllPlaylists,
     ManagedPlaylist,
+    SyncStatus,
+    ApiError,
 } from '@/lib/api';
 
 const GENRE_COLORS: Record<string, string> = {
@@ -28,6 +33,9 @@ const GENRE_COLORS: Record<string, string> = {
 
 export default function Playlists() {
     const router = useRouter();
+    const { showToast } = useToast();
+    const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+    const [isSyncingAll, setIsSyncingAll] = useState(false);
     const [playlists, setPlaylists] = useState<ManagedPlaylist[]>([]);
     const [totalSongs, setTotalSongs] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -39,6 +47,7 @@ export default function Playlists() {
 
     useEffect(() => {
         loadPlaylists();
+        loadSyncStatus();
     }, []);
 
     const loadPlaylists = async () => {
@@ -52,7 +61,47 @@ export default function Playlists() {
         setLoading(false);
     };
 
+    const loadSyncStatus = async () => {
+        try {
+            const status = await getSyncStatus();
+            setSyncStatus(status);
+        } catch (err) {
+            // No synced playlists yet
+        }
+    };
+
+    const handleSyncAll = async () => {
+        if (!syncStatus || syncStatus.new_songs_count === 0) return;
+
+        setIsSyncingAll(true);
+
+        try {
+            const result = await syncAllPlaylists();
+
+            // Build success message based on result
+            let message = `${result.playlists_updated} crates synced • ${result.total_songs} songs`;
+            if (result.failed_playlists && result.failed_playlists.length > 0) {
+                message += ` (${result.failed_playlists.length} failed)`;
+            }
+
+            showToast(message, result.failed_playlists?.length ? 'error' : 'success');
+            setSyncStatus(null);
+            loadPlaylists();
+        } catch (err) {
+            // Don't show toast for 401 errors - user is being redirected
+            if (err instanceof ApiError && err.status === 401) return;
+
+            showToast('Sync failed — Retry', 'error', {
+                label: 'Retry',
+                onClick: handleSyncAll,
+            });
+        } finally {
+            setIsSyncingAll(false);
+        }
+    };
+
     const handleRefresh = async (id: string) => {
+        const playlist = playlists.find(p => p.spotify_id === id);
         setRefreshingId(id);
         try {
             const result = await refreshPlaylist(id);
@@ -61,8 +110,13 @@ export default function Playlists() {
                     p.spotify_id === id ? { ...p, song_count: result.song_count } : p
                 )
             );
+            showToast(`Added ${result.song_count} songs to ${playlist?.genre || 'playlist'}`, 'success');
+            loadSyncStatus(); // Refresh sync status
         } catch (err) {
-            console.error(err);
+            showToast(`Couldn't sync ${playlist?.genre || 'playlist'} — Retry`, 'error', {
+                label: 'Retry',
+                onClick: () => handleRefresh(id),
+            });
         }
         setRefreshingId(null);
     };
@@ -141,9 +195,22 @@ export default function Playlists() {
                             </p>
                         </div>
                     </div>
-                    <Button onClick={() => router.push('/dashboard')}>
-                        + New Organize
-                    </Button>
+                    {syncStatus && syncStatus.new_songs_count > 0 ? (
+                        <Button onClick={handleSyncAll} disabled={isSyncingAll}>
+                            {isSyncingAll ? (
+                                <>
+                                    <VinylIcon spinning size={20} />
+                                    Syncing...
+                                </>
+                            ) : (
+                                `Sync All (${syncStatus.new_songs_count} new)`
+                            )}
+                        </Button>
+                    ) : (
+                        <Button onClick={() => router.push('/dashboard')}>
+                            + New Organize
+                        </Button>
+                    )}
                 </div>
 
                 {playlists.length === 0 ? (
@@ -192,6 +259,17 @@ export default function Playlists() {
                                                     >
                                                         {playlist.genre}
                                                     </span>
+                                                    {(() => {
+                                                        const newCount = syncStatus?.playlists.find(p => p.spotify_id === playlist.spotify_id)?.new_count;
+                                                        return newCount ? (
+                                                            <span
+                                                                className="text-sm font-medium"
+                                                                style={{ color }}
+                                                            >
+                                                                +{newCount} new
+                                                            </span>
+                                                        ) : null;
+                                                    })()}
 
                                                     {isEditing ? (
                                                         <div className="mt-2 space-y-3" onClick={(e) => e.stopPropagation()}>
