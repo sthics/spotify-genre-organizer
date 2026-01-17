@@ -6,7 +6,7 @@ import { VinylIcon } from '@/components/VinylIcon';
 import { Button } from '@/components/Button';
 import { Slider } from '@/components/Slider';
 import { useUser } from '@/hooks/useUser';
-import { startOrganize, logout, getLibraryCount } from '@/lib/api';
+import { startOrganize, logout, getLibraryCount, getSyncStatus } from '@/lib/api';
 
 const LIBRARY_COUNT_CACHE_KEY = 'spotify_library_count';
 
@@ -18,6 +18,7 @@ export default function Dashboard() {
   const [isOrganizing, setIsOrganizing] = useState(false);
   const [likedSongsCount, setLikedSongsCount] = useState<number | null>(null);
   const [countLoading, setCountLoading] = useState(true);
+  const [newSongsCount, setNewSongsCount] = useState(0);
 
   useEffect(() => {
     // Check localStorage first for instant display
@@ -45,6 +46,18 @@ export default function Dashboard() {
     };
 
     fetchCount();
+
+    // Fetch sync status
+    const fetchSyncStatus = async () => {
+      try {
+        const status = await getSyncStatus();
+        setNewSongsCount(status.new_songs_count);
+      } catch (error) {
+        // Silently fail - no playlists synced yet is fine
+      }
+    };
+
+    fetchSyncStatus();
   }, []);
 
   const songsPerPlaylist = likedSongsCount ? Math.round(likedSongsCount / playlistCount) : 0;
@@ -178,12 +191,22 @@ export default function Dashboard() {
           <Button
             size="lg"
             variant="secondary"
-            className="w-full flex items-center justify-center gap-2"
+            className="w-full flex items-center justify-center gap-2 relative"
             onClick={() => router.push('/playlists')}
           >
             <VinylIcon size={20} />
             Manage My Crates
+            {newSongsCount > 0 && (
+              <span className="bg-accent-orange text-white text-xs font-bold px-2 py-0.5 rounded-full ml-2 animate-fade-in">
+                {newSongsCount}
+              </span>
+            )}
           </Button>
+          {newSongsCount > 0 && (
+            <p className="text-text-muted text-sm text-center mt-2 animate-fade-in">
+              {newSongsCount} song{newSongsCount !== 1 ? 's' : ''} waiting to be organized
+            </p>
+          )}
         </div>
 
         {/* Organize Button */}
