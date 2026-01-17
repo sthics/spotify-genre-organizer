@@ -1,6 +1,12 @@
-# Force Railway to use the Dockerfile instead of Nixpacks
+# Nixpacks configuration for Next.js frontend
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = ["npm ci"]
+
 [phases.build]
-cmds = []
+cmds = ["npm run build"]
 
 [start]
-cmd = "node server.js"
+cmd = "npm run start"

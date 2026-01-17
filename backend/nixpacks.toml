@@ -1,6 +1,9 @@
-# Force Railway to use the Dockerfile instead of Nixpacks
+# Nixpacks configuration for Go backend
+[phases.setup]
+nixPkgs = ["go_1_23"]
+
 [phases.build]
-cmds = []
+cmds = ["go build -o api ./cmd/api"]
 
 [start]
 cmd = "./api"
