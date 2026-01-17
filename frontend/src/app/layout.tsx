@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ToastProvider } from '@/contexts/ToastContext';
 
 export const metadata: Metadata = {
   title: "Spotify Genre Organizer",
@@ -14,8 +15,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen bg-bg-dark text-text-cream antialiased">
-        <div className="grain-overlay" />
-        {children}
+        <ToastProvider>
+          <div className="grain-overlay" />
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );
