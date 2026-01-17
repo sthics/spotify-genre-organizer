@@ -68,7 +68,13 @@ func ParseLikedSongsResponse(data []byte) ([]Song, int, string, error) {
 			}
 		}
 
-		addedAt, _ := time.Parse(time.RFC3339, item.AddedAt)
+		// Parse added_at timestamp - use current time as fallback to avoid
+		// zero-time causing incorrect "new song" detection
+		addedAt, err := time.Parse(time.RFC3339, item.AddedAt)
+		if err != nil {
+			log.Printf("Warning: failed to parse added_at for track %s: %v", item.Track.ID, err)
+			addedAt = time.Now() // Fallback: treat as recently added
+		}
 
 		songs[i] = Song{
 			ID:      item.Track.ID,
@@ -138,6 +144,7 @@ func GetOldestSyncTimestamp(userID string) (*time.Time, error) {
 ```go
 import (
 	"encoding/json"
+	"log"
 	"time"
 
 	"github.com/spotify-genre-organizer/backend/internal/models"
@@ -193,7 +200,11 @@ func GetSyncStatus(c *gin.Context) {
 		return
 	}
 
-	userID, _ := c.Cookie("user_id")
+	userID, err := c.Cookie("user_id")
+	if err != nil || userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
 
 	// Get oldest sync timestamp
 	oldestSync, err := database.GetOldestSyncTimestamp(userID)
@@ -220,9 +231,11 @@ func GetSyncStatus(c *gin.Context) {
 	}
 
 	// Filter to songs added after oldest sync
+	// Subtract 1 minute buffer to account for timezone/precision edge cases
+	syncThreshold := oldestSync.Add(-1 * time.Minute)
 	var newSongs []spotify.Song
 	for _, song := range songs {
-		if song.AddedAt.After(*oldestSync) {
+		if song.AddedAt.After(syncThreshold) {
 			newSongs = append(newSongs, song)
 		}
 	}
@@ -299,8 +312,9 @@ git commit -m "feat(backend): add sync status handler"
 
 ```go
 type SyncAllResponse struct {
-	PlaylistsUpdated int `json:"playlists_updated"`
-	SongsAdded       int `json:"songs_added"`
+	PlaylistsUpdated int      `json:"playlists_updated"`
+	TotalSongs       int      `json:"total_songs"`       // Renamed: total songs in synced playlists (not just new)
+	FailedPlaylists  []string `json:"failed_playlists,omitempty"`
 }
 
 func SyncAllPlaylists(c *gin.Context) {
@@ -310,7 +324,11 @@ func SyncAllPlaylists(c *gin.Context) {
 		return
 	}
 
-	userID, _ := c.Cookie("user_id")
+	userID, err := c.Cookie("user_id")
+	if err != nil || userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
 
 	// Fetch all liked songs
 	songs, err := spotify.FetchAllLikedSongs(accessToken, nil)
@@ -342,7 +360,8 @@ func SyncAllPlaylists(c *gin.Context) {
 	}
 
 	playlistsUpdated := 0
-	totalSongsAdded := 0
+	totalSongs := 0
+	var failedPlaylists []string
 	now := time.Now()
 
 	for playlistID, override := range overrides {
@@ -357,6 +376,8 @@ func SyncAllPlaylists(c *gin.Context) {
 
 		// Clear and repopulate playlist
 		if err := spotify.ClearPlaylist(accessToken, playlistID); err != nil {
+			log.Printf("Failed to clear playlist %s: %v", playlistID, err)
+			failedPlaylists = append(failedPlaylists, override.Genre)
 			continue
 		}
 
@@ -366,20 +387,26 @@ func SyncAllPlaylists(c *gin.Context) {
 		}
 
 		if err := spotify.AddTracksToPlaylist(accessToken, playlistID, trackIDs); err != nil {
+			log.Printf("Failed to add tracks to playlist %s: %v", playlistID, err)
+			failedPlaylists = append(failedPlaylists, override.Genre)
 			continue
 		}
 
 		// Update last_synced_at
 		override.LastSyncedAt = &now
-		database.SavePlaylistOverride(override)
+		if err := database.SavePlaylistOverride(override); err != nil {
+			log.Printf("Failed to save override for playlist %s: %v", playlistID, err)
+			// Don't add to failed - the sync itself succeeded
+		}
 
 		playlistsUpdated++
-		totalSongsAdded += len(genreSongs)
+		totalSongs += len(genreSongs)
 	}
 
 	c.JSON(http.StatusOK, SyncAllResponse{
 		PlaylistsUpdated: playlistsUpdated,
-		SongsAdded:       totalSongsAdded,
+		TotalSongs:       totalSongs,
+		FailedPlaylists:  failedPlaylists,
 	})
 }
 ```
@@ -657,20 +684,45 @@ export interface SyncStatus {
   playlists: PlaylistSyncStatus[];
 }
 
+export interface SyncAllResult {
+  playlists_updated: number;
+  total_songs: number;
+  failed_playlists?: string[];
+}
+
+// Custom error class for API errors with status codes
+export class ApiError extends Error {
+  constructor(message: string, public status: number) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+function handleApiResponse(response: Response): void {
+  if (response.status === 401) {
+    // Token expired - redirect to login
+    window.location.href = '/api/auth/login';
+    throw new ApiError('Session expired', 401);
+  }
+  if (!response.ok) {
+    throw new ApiError(`Request failed: ${response.statusText}`, response.status);
+  }
+}
+
 export async function getSyncStatus(): Promise<SyncStatus> {
   const response = await fetch(`${API_URL}/api/library/sync-status`, {
     credentials: 'include',
   });
-  if (!response.ok) throw new Error('Failed to get sync status');
+  handleApiResponse(response);
   return response.json();
 }
 
-export async function syncAllPlaylists(): Promise<{ playlists_updated: number; songs_added: number }> {
+export async function syncAllPlaylists(): Promise<SyncAllResult> {
   const response = await fetch(`${API_URL}/api/playlists/sync-all`, {
     method: 'POST',
     credentials: 'include',
   });
-  if (!response.ok) throw new Error('Failed to sync playlists');
+  handleApiResponse(response);
   return response.json();
 }
 ```
@@ -777,6 +829,7 @@ import {
     syncAllPlaylists,
     ManagedPlaylist,
     SyncStatus,
+    ApiError,
 } from '@/lib/api';
 ```
 
@@ -816,26 +869,22 @@ const handleSyncAll = async () => {
 
     setIsSyncingAll(true);
 
-    // Show starting toast with random message
-    const messages = [
-        'Sorting your new vinyl...',
-        `Filing ${syncStatus.new_songs_count} tracks into your crates...`,
-        'Spinning up your new additions...',
-        'Dropping new records into your crates...',
-        `${syncStatus.new_songs_count} new tracks heading to their crates...`,
-    ];
-    const startMessage = messages[Math.floor(Math.random() * messages.length)];
-    showToast(startMessage, 'success');
-
     try {
         const result = await syncAllPlaylists();
-        showToast(
-            `${result.playlists_updated} crates updated • ${result.songs_added} songs added`,
-            'success'
-        );
+        
+        // Build success message based on result
+        let message = `${result.playlists_updated} crates synced • ${result.total_songs} songs`;
+        if (result.failed_playlists && result.failed_playlists.length > 0) {
+            message += ` (${result.failed_playlists.length} failed)`;
+        }
+        
+        showToast(message, result.failed_playlists?.length ? 'error' : 'success');
         setSyncStatus(null);
         loadPlaylists();
     } catch (err) {
+        // Don't show toast for 401 errors - user is being redirected
+        if (err instanceof ApiError && err.status === 401) return;
+        
         showToast('Sync failed — Retry', 'error', {
             label: 'Retry',
             onClick: handleSyncAll,
@@ -871,18 +920,31 @@ Replace the header Button:
 
 **Step 6: Add per-playlist new count indicator**
 
-In the playlist card, after the genre badge, add:
+In the playlist card, extract the new count to avoid duplicate lookups:
 
 ```tsx
-{syncStatus?.playlists.find(p => p.spotify_id === playlist.spotify_id)?.new_count && (
-    <span
-        className="text-sm font-medium ml-auto"
-        style={{ color }}
-    >
-        +{syncStatus.playlists.find(p => p.spotify_id === playlist.spotify_id)?.new_count} new
-    </span>
-)}
+{/* Per-playlist new songs indicator */}
+{(() => {
+    const newCount = syncStatus?.playlists.find(p => p.spotify_id === playlist.spotify_id)?.new_count;
+    return newCount ? (
+        <span
+            className="text-sm font-medium ml-auto"
+            style={{ color }}
+        >
+            +{newCount} new
+        </span>
+    ) : null;
+})()}
 ```
+
+> **Note:** Alternatively, compute `newCountMap` once at the component level:
+> ```tsx
+> const newCountMap = useMemo(() => 
+>     new Map(syncStatus?.playlists.map(p => [p.spotify_id, p.new_count]) ?? []),
+>     [syncStatus]
+> );
+> // Then use: newCountMap.get(playlist.spotify_id)
+> ```
 
 **Step 7: Update refresh handler to show toast**
 
@@ -980,14 +1042,35 @@ git commit -m "feat(backend): set last_synced_at when creating playlists"
 
 ---
 
+## Edge Cases & Error Handling
+
+> [!IMPORTANT]
+> These edge cases should be tested before production deployment.
+
+| Edge Case | Behavior | Notes |
+|-----------|----------|-------|
+| User has 0 playlists synced | Returns empty response with `new_songs_count: 0` | ✅ Handled |
+| User has playlists but 0 liked songs | Returns 0 new songs | ✅ Handled |
+| Song removed from liked songs after sync | May show negative delta on next sync | Full sync clears/repopulates, so this is fine |
+| Playlist deleted on Spotify | `ClearPlaylist` returns error, added to `failed_playlists` | ✅ Handled |
+| Spotify rate limit (429) | Request fails, shows in `failed_playlists` | Consider retry with backoff in future |
+| Access token expired mid-sync | 401 triggers redirect to login | ✅ Handled with `ApiError` |
+| User clicks sync while sync is running | Button disabled via `isSyncingAll` state | ✅ Handled |
+| Malformed `added_at` timestamp | Falls back to `time.Now()`, logged as warning | ✅ Handled |
+| Empty `user_id` cookie | Returns 401 Unauthorized | ✅ Handled |
+| Timezone/precision edge cases | 1-minute buffer on sync threshold | ✅ Handled |
+
+---
+
 ## Summary
 
 This implementation adds:
 
 1. **Backend:**
    - `GET /api/library/sync-status` - Returns new song count and per-playlist breakdown
-   - `POST /api/playlists/sync-all` - Syncs all playlists at once
+   - `POST /api/playlists/sync-all` - Syncs all playlists, returns failed playlist list
    - Updated `RefreshPlaylist` and organize to set `last_synced_at`
+   - Proper error handling for auth, time parsing, and failed operations
 
 2. **Frontend:**
    - Toast component and context for notifications
@@ -995,3 +1078,5 @@ This implementation adds:
    - Playlists page with Sync All button
    - Per-playlist new song indicators
    - Success/error toasts for all sync operations
+   - 401 handling with automatic redirect to login
+   - `ApiError` class for typed error handling

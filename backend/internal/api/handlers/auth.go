@@ -11,6 +11,24 @@ import (
 	"github.com/spotify-genre-organizer/backend/internal/spotify"
 )
 
+// setCookie sets a cookie with proper SameSite attributes for cross-origin support
+func setCookie(c *gin.Context, name, value string, maxAge int, path string, secure, httpOnly bool) {
+	sameSite := http.SameSiteLaxMode
+	if secure {
+		// Cross-origin cookies require SameSite=None + Secure
+		sameSite = http.SameSiteNoneMode
+	}
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     name,
+		Value:    value,
+		MaxAge:   maxAge,
+		Path:     path,
+		Secure:   secure,
+		HttpOnly: httpOnly,
+		SameSite: sameSite,
+	})
+}
+
 var spotifyConfig *spotify.Config
 
 func getSpotifyConfig() *spotify.Config {
@@ -32,7 +50,7 @@ func isProduction() bool {
 
 func Login(c *gin.Context) {
 	state := generateState()
-	c.SetCookie("oauth_state", state, 600, "/", "", isProduction(), true)
+	setCookie(c, "oauth_state", state, 600, "/", isProduction(), true)
 	authURL := getSpotifyConfig().GetAuthURL(state)
 	c.Redirect(http.StatusTemporaryRedirect, authURL)
 }
@@ -67,8 +85,8 @@ func Callback(c *gin.Context) {
 
 	expiresAt := time.Now().Add(time.Duration(tokens.ExpiresIn) * time.Second)
 	secure := isProduction()
-	c.SetCookie("user_id", profile.ID, tokens.ExpiresIn, "/", "", secure, true)
-	c.SetCookie("access_token", tokens.AccessToken, tokens.ExpiresIn, "/", "", secure, true)
+	setCookie(c, "user_id", profile.ID, tokens.ExpiresIn, "/", secure, true)
+	setCookie(c, "access_token", tokens.AccessToken, tokens.ExpiresIn, "/", secure, true)
 	_ = expiresAt
 
 	c.Redirect(http.StatusTemporaryRedirect, os.Getenv("FRONTEND_URL")+"/dashboard")
@@ -96,8 +114,8 @@ func Me(c *gin.Context) {
 
 func Logout(c *gin.Context) {
 	secure := isProduction()
-	c.SetCookie("user_id", "", -1, "/", "", secure, true)
-	c.SetCookie("access_token", "", -1, "/", "", secure, true)
-	c.SetCookie("oauth_state", "", -1, "/", "", secure, true)
+	setCookie(c, "user_id", "", -1, "/", secure, true)
+	setCookie(c, "access_token", "", -1, "/", secure, true)
+	setCookie(c, "oauth_state", "", -1, "/", secure, true)
 	c.JSON(http.StatusOK, gin.H{"message": "logged out"})
 }
