@@ -1,9 +1,0 @@
-# Nixpacks configuration for Go backend
-[phases.setup]
-nixPkgs = ["go_1_23"]
-
-[phases.build]
-cmds = ["go build -o api ./cmd/api"]
-
-[start]
-cmd = "./api"
