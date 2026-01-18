@@ -13,8 +13,12 @@ import (
 
 // setCookie sets a cookie with proper SameSite attributes for cross-origin support
 func setCookie(c *gin.Context, name, value string, maxAge int, path string, secure, httpOnly bool) {
-	// Use SameSite=Lax for OAuth flow - the redirect happens on the same domain
-	// SameSite=None can cause issues with some browsers during redirects
+	// In production (secure=true), use SameSite=None for cross-origin cookie sharing
+	// The frontend and backend are on different domains, so we need SameSite=None + Secure
+	sameSite := http.SameSiteLaxMode
+	if secure {
+		sameSite = http.SameSiteNoneMode
+	}
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     name,
 		Value:    value,
@@ -22,7 +26,7 @@ func setCookie(c *gin.Context, name, value string, maxAge int, path string, secu
 		Path:     path,
 		Secure:   secure,
 		HttpOnly: httpOnly,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: sameSite,
 	})
 }
 
