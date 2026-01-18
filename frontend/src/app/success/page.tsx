@@ -97,6 +97,14 @@ function SuccessContent() {
           <span className="ml-2">&#9679;</span>
         </Button>
         <Button
+          size="lg"
+          variant="secondary"
+          onClick={() => router.push('/playlists')}
+        >
+          <VinylIcon size={20} />
+          View My Crates
+        </Button>
+        <Button
           variant="ghost"
           onClick={() => router.push('/dashboard')}
         >
