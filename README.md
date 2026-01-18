@@ -11,6 +11,18 @@ A scalable, production-ready application that automatically organizes your Spoti
 - **Last.fm Integration**: Enhanced genre detection (coming soon)
 - **Analytics**: Visualize your music taste and trends
 
+## ⚠️ Spotify API Limitation
+
+> **Important:** This app uses the Spotify Web API in **Development Mode**, which limits access to **25 users maximum**.
+>
+> As of May 2025, Spotify only grants extended access to registered businesses with 250k+ monthly active users.
+>
+> **To use this app:**
+> 1. Request access from the app owner
+> 2. Your Spotify email must be added to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) allowlist
+>
+> This is a Spotify policy limitation, not a limitation of this application.
+
 ## 🏗️ Architecture
 
 ### Tech Stack
