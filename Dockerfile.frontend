@@ -11,7 +11,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY frontend/ .
 
 # Hardcode the production API URL
-ENV NEXT_PUBLIC_API_URL=https://spotify-genre-organizer-production.up.railway.app
+ENV NEXT_PUBLIC_API_URL=https://honest-determination-production.up.railway.app
 
 RUN npm run build
 
