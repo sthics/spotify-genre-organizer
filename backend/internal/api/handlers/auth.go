@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/spotify-genre-organizer/backend/internal/database"
 	"github.com/spotify-genre-organizer/backend/internal/spotify"
 )
 
@@ -85,10 +86,16 @@ func Callback(c *gin.Context) {
 	}
 
 	expiresAt := time.Now().Add(time.Duration(tokens.ExpiresIn) * time.Second)
+
+	// Create or update user in database
+	if err := database.UpsertUser(profile.ID, profile.DisplayName, profile.Email, tokens.AccessToken, expiresAt); err != nil {
+		c.Redirect(http.StatusTemporaryRedirect, os.Getenv("FRONTEND_URL")+"?error=database_error")
+		return
+	}
+
 	secure := isProduction()
 	setCookie(c, "user_id", profile.ID, tokens.ExpiresIn, "/", secure, true)
 	setCookie(c, "access_token", tokens.AccessToken, tokens.ExpiresIn, "/", secure, true)
-	_ = expiresAt
 
 	c.Redirect(http.StatusTemporaryRedirect, os.Getenv("FRONTEND_URL")+"/dashboard")
 }
