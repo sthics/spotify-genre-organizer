@@ -119,6 +119,7 @@ func SetupRoutes(r *gin.Engine) {
 		api.GET("/organize/:id", handlers.GetOrganizeStatus)
 
 		api.GET("/library/count", handlers.GetLibraryCount)
+		api.GET("/library/genres", handlers.GetLibraryGenres)
 
 		api.GET("/settings", handlers.GetSettings)
 		api.PUT("/settings", handlers.UpdateSettings)
