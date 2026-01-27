@@ -1,6 +1,11 @@
 package genres
 
-import "strings"
+import (
+	"sort"
+	"strings"
+
+	"github.com/spotify-genre-organizer/backend/internal/spotify"
+)
 
 var ParentGenres = []string{
 	"Rock", "Pop", "Hip-Hop", "Electronic", "R&B", "Jazz", "Classical",
@@ -104,6 +109,17 @@ var genreMapping = map[string]string{
 	"celtic": "World", "flamenco": "World", "indian": "World", "middle eastern": "World",
 }
 
+type SubGenreCount struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
+type ParentGenreCount struct {
+	Name      string          `json:"name"`
+	Count     int             `json:"count"`
+	SubGenres []SubGenreCount `json:"sub_genres"`
+}
+
 func ConsolidateGenre(microGenre string) string {
 	normalized := strings.ToLower(strings.TrimSpace(microGenre))
 
@@ -184,4 +200,73 @@ func ScoreGenres(microGenres []string) string {
 	}
 
 	return "Other"
+}
+
+// AnalyzeLibraryGenres analyzes songs and returns detailed genre breakdown
+// Returns parent genres with sub-genre counts and a map of song IDs to their sub-genres
+func AnalyzeLibraryGenres(songs []spotify.Song) ([]ParentGenreCount, map[string][]string) {
+	// Track sub-genre counts per parent
+	parentSubGenres := make(map[string]map[string]int) // parent -> subgenre -> count
+	songGenreMap := make(map[string][]string)          // trackID -> []subgenres
+
+	for _, song := range songs {
+		trackSubGenres := make(map[string]bool)
+		for _, microGenre := range song.Genres {
+			normalized := strings.ToLower(strings.TrimSpace(microGenre))
+			if normalized == "" {
+				continue
+			}
+			parent := ConsolidateGenre(normalized)
+
+			// Initialize parent map if needed
+			if parentSubGenres[parent] == nil {
+				parentSubGenres[parent] = make(map[string]int)
+			}
+
+			// Count this sub-genre under its parent
+			parentSubGenres[parent][normalized]++
+			trackSubGenres[normalized] = true
+		}
+
+		// Store sub-genres for this track
+		if len(trackSubGenres) > 0 {
+			for sg := range trackSubGenres {
+				songGenreMap[song.ID] = append(songGenreMap[song.ID], sg)
+			}
+		}
+	}
+
+	// Build result sorted by count
+	var result []ParentGenreCount
+	for _, parentName := range ParentGenres {
+		subGenres := parentSubGenres[parentName]
+		if len(subGenres) == 0 {
+			continue
+		}
+
+		var subGenreCounts []SubGenreCount
+		totalCount := 0
+		for sg, count := range subGenres {
+			subGenreCounts = append(subGenreCounts, SubGenreCount{Name: sg, Count: count})
+			totalCount += count
+		}
+
+		// Sort sub-genres by count descending
+		sort.Slice(subGenreCounts, func(i, j int) bool {
+			return subGenreCounts[i].Count > subGenreCounts[j].Count
+		})
+
+		result = append(result, ParentGenreCount{
+			Name:      parentName,
+			Count:     totalCount,
+			SubGenres: subGenreCounts,
+		})
+	}
+
+	// Sort parents by count descending
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Count > result[j].Count
+	})
+
+	return result, songGenreMap
 }
