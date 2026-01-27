@@ -104,3 +104,44 @@ func GetOldestSyncTimestamp(userID string) (*time.Time, error) {
 
 	return results[0].LastSyncedAt, nil
 }
+
+// GetGenreAnalysisCache retrieves cached genre analysis for a user
+func GetGenreAnalysisCache(userID string) (*models.GenreAnalysisCache, error) {
+	res, _, err := Client.From("genre_analysis_cache").
+		Select("*", "", false).
+		Eq("user_id", userID).
+		Single().
+		Execute()
+
+	if err != nil {
+		return nil, err
+	}
+
+	var cache models.GenreAnalysisCache
+	if err := json.Unmarshal(res, &cache); err != nil {
+		return nil, err
+	}
+
+	return &cache, nil
+}
+
+// SaveGenreAnalysisCache upserts genre analysis cache
+func SaveGenreAnalysisCache(cache *models.GenreAnalysisCache) error {
+	cache.UpdatedAt = time.Now()
+
+	_, _, err := Client.From("genre_analysis_cache").
+		Upsert(cache, "", "", "").
+		Execute()
+
+	return err
+}
+
+// DeleteGenreAnalysisCache removes cached analysis (for refresh)
+func DeleteGenreAnalysisCache(userID string) error {
+	_, _, err := Client.From("genre_analysis_cache").
+		Delete("", "").
+		Eq("user_id", userID).
+		Execute()
+
+	return err
+}
