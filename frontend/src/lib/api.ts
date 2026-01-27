@@ -207,3 +207,51 @@ export async function syncAllPlaylists(): Promise<SyncAllResult> {
   handleApiResponse(response);
   return response.json();
 }
+
+// Genre Analysis Types
+export interface SubGenreCount {
+  name: string;
+  count: number;
+}
+
+export interface ParentGenreCount {
+  name: string;
+  count: number;
+  sub_genres: SubGenreCount[];
+}
+
+export interface LibraryGenresResponse {
+  parent_genres: ParentGenreCount[];
+  analyzed_at: string;
+  total_songs: number;
+}
+
+export async function getLibraryGenres(refresh = false): Promise<LibraryGenresResponse> {
+  const url = refresh
+    ? `${API_URL}/api/library/genres?refresh=true`
+    : `${API_URL}/api/library/genres`;
+
+  const response = await fetch(url, {
+    credentials: 'include',
+  });
+  handleApiResponse(response);
+  return response.json();
+}
+
+// Custom Playlist Types
+export interface CustomPlaylistRequest {
+  sub_genres: string[];
+  mode: 'combined' | 'separate';
+  name?: string;
+}
+
+export async function startCustomPlaylist(request: CustomPlaylistRequest): Promise<{ job_id: string }> {
+  const response = await fetch(`${API_URL}/api/custom-playlist`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  });
+  handleApiResponse(response);
+  return response.json();
+}
