@@ -120,6 +120,7 @@ func SetupRoutes(r *gin.Engine) {
 
 		api.GET("/library/count", handlers.GetLibraryCount)
 		api.GET("/library/genres", handlers.GetLibraryGenres)
+		api.POST("/custom-playlist", handlers.StartCustomPlaylist)
 
 		api.GET("/settings", handlers.GetSettings)
 		api.PUT("/settings", handlers.UpdateSettings)
