@@ -91,22 +91,29 @@ function SuccessContent() {
       </div>
 
       {/* Actions */}
-      <div className="flex flex-col sm:flex-row gap-4 items-center">
-        <Button size="lg" onClick={handleOpenAll}>
+      <div className="flex flex-col sm:flex-row gap-4 items-center justify-center w-full">
+        <Button
+          size="lg"
+          onClick={handleOpenAll}
+          className="flex items-center justify-center gap-2 min-w-[200px]"
+        >
           Open All in Spotify
-          <span className="ml-2">&#9679;</span>
+          <span className="text-xl leading-none">●</span>
         </Button>
         <Button
           size="lg"
           variant="secondary"
           onClick={() => router.push('/playlists')}
+          className="flex items-center justify-center gap-2 min-w-[200px]"
         >
           <VinylIcon size={20} />
           View My Crates
         </Button>
         <Button
+          size="lg"
           variant="ghost"
           onClick={() => router.push('/dashboard')}
+          className="flex items-center justify-center min-w-[150px]"
         >
           Organize Again
         </Button>

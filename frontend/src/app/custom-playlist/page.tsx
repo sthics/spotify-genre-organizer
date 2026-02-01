@@ -5,8 +5,18 @@ import { useRouter } from 'next/navigation';
 import { VinylIcon } from '@/components/VinylIcon';
 import { Button } from '@/components/Button';
 import { GenrePicker } from '@/components/GenrePicker';
+import { Skeleton } from '@/components/Skeleton';
 import { useUser } from '@/hooks/useUser';
 import { getLibraryGenres, LibraryGenresResponse } from '@/lib/api';
+
+const LOADING_MESSAGES = [
+    "Dusting off the vinyls...",
+    "Categorizing the vibes...",
+    "Finding your hidden gems...",
+    "Tuning the frequencies...",
+    "Digging deep into the crates...",
+    "Polishing the grooves..."
+];
 
 export default function CustomPlaylistPage() {
     const { user, loading: userLoading } = useUser();
@@ -15,6 +25,7 @@ export default function CustomPlaylistPage() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [selectedGenres, setSelectedGenres] = useState<Set<string>>(new Set());
+    const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
 
     useEffect(() => {
         const fetchGenres = async () => {
@@ -30,6 +41,15 @@ export default function CustomPlaylistPage() {
 
         fetchGenres();
     }, []);
+
+    // Rotate loading messages
+    useEffect(() => {
+        if (!loading) return;
+        const interval = setInterval(() => {
+            setLoadingMessageIndex((prev) => (prev + 1) % LOADING_MESSAGES.length);
+        }, 2000);
+        return () => clearInterval(interval);
+    }, [loading]);
 
     const handleRefresh = async () => {
         setRefreshing(true);
@@ -76,10 +96,47 @@ export default function CustomPlaylistPage() {
         router.push('/custom-playlist/configure');
     };
 
-    if (userLoading || loading) {
+    // Show initial spinner only for auth check, or skeleton for data load
+    if (userLoading) {
         return (
             <main className="min-h-screen flex items-center justify-center">
                 <VinylIcon spinning size={64} />
+            </main>
+        );
+    }
+
+    if (loading) {
+        return (
+            <main className="min-h-screen flex flex-col px-4 py-8">
+                {/* Skeleton Header */}
+                <div className="max-w-2xl mx-auto w-full mb-8">
+                    <div className="flex items-center gap-2 mb-4">
+                        <Skeleton className="w-5 h-5 rounded-full" />
+                        <Skeleton className="w-12 h-5" />
+                    </div>
+
+                    <h1 className="font-display text-3xl text-text-cream mb-2 animate-pulse">
+                        Digging through {user?.display_name?.split(' ')[0] || 'your'}&apos;s crates...
+                    </h1>
+                    <p className="text-text-muted italic animate-fade-in key={loadingMessageIndex}">
+                        {LOADING_MESSAGES[loadingMessageIndex]}
+                    </p>
+                </div>
+
+                {/* Skeleton Genre Grid */}
+                <div className="max-w-2xl mx-auto w-full flex-1 mb-24 space-y-2">
+                    {[...Array(8)].map((_, i) => (
+                        <Skeleton key={i} className="w-full h-20 rounded-xl" />
+                    ))}
+                </div>
+
+                {/* Skeleton Bottom Bar */}
+                <div className="fixed bottom-0 left-0 right-0 bg-bg-dark border-t border-bg-card p-4">
+                    <div className="max-w-2xl mx-auto flex items-center justify-between">
+                        <Skeleton className="w-48 h-8" />
+                        <Skeleton className="w-24 h-10 rounded-lg" />
+                    </div>
+                </div>
             </main>
         );
     }
