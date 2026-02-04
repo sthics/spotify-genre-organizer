@@ -7,6 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/spotify-genre-organizer/backend/internal/database"
+	"github.com/spotify-genre-organizer/backend/internal/filters"
 	"github.com/spotify-genre-organizer/backend/internal/organizer"
 	"github.com/spotify-genre-organizer/backend/internal/spotify"
 )
@@ -112,6 +114,14 @@ func processOrganizeJob(job *JobStatus, accessToken, userID string, req Organize
 
 	// Enrich songs with genres
 	spotify.EnrichSongsWithGenres(songs, artistGenres)
+
+	// Apply exclusion rules
+	exclusionRules, err := database.GetExclusionRules(userID)
+	if err != nil {
+		log.Printf("organize job %s: warning - failed to fetch exclusion rules: %v", job.ID, err)
+		// Continue without filtering - don't fail the job
+	}
+	songs = filters.ApplyExclusions(songs, exclusionRules)
 
 	// Collect discovered genres for UI
 	genreSet := make(map[string]bool)
