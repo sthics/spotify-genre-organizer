@@ -93,6 +93,15 @@ func processCustomPlaylistJob(job *JobStatus, accessToken, userID string, req Cu
 		}
 	}
 
+	// Apply exclusion rules to track IDs
+	exclusionRules, err := database.GetExclusionRules(userID)
+	if err != nil {
+		log.Printf("custom playlist job %s: warning - failed to fetch exclusion rules: %v", job.ID, err)
+	}
+	if len(exclusionRules) > 0 {
+		matchingTrackIDs = filterTrackIDsByExclusions(matchingTrackIDs, exclusionRules)
+	}
+
 	if len(matchingTrackIDs) == 0 {
 		job.Status = "failed"
 		job.Error = "No songs found matching selected genres"
@@ -197,4 +206,27 @@ func processCustomPlaylistJob(job *JobStatus, accessToken, userID string, req Cu
 		Playlists: playlists,
 	}
 	updateJob()
+}
+
+// filterTrackIDsByExclusions removes excluded tracks
+// Note: This is a simplified version - full song data not available from cache
+func filterTrackIDsByExclusions(trackIDs []string, rules []models.ExclusionRule) []string {
+	blockedSongs := make(map[string]bool)
+	for _, rule := range rules {
+		if rule.ExclusionType == models.ExclusionTypeSong {
+			blockedSongs[rule.SpotifyID] = true
+		}
+	}
+
+	// For artist exclusions, we'd need track->artist mapping which isn't in cache
+	// This will be handled when we have full song data in organize flow
+	// Custom playlist from cache only filters song-level exclusions
+
+	result := make([]string, 0, len(trackIDs))
+	for _, id := range trackIDs {
+		if !blockedSongs[id] {
+			result = append(result, id)
+		}
+	}
+	return result
 }

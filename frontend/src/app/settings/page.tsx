@@ -165,6 +165,24 @@ export default function Settings() {
             </Button>
           </div>
         </div>
+
+        {/* Exclusions Link */}
+        <div className="mt-6">
+          <button
+            onClick={() => router.push('/settings/exclusions')}
+            className="w-full bg-bg-card rounded-xl p-6 text-left hover:bg-bg-card/80 transition-colors group"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-display text-lg text-text-cream">Blocked Artists & Songs</h2>
+                <p className="text-sm text-text-muted">Manage your blocklist</p>
+              </div>
+              <svg className="w-5 h-5 text-text-muted group-hover:text-text-cream transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </button>
+        </div>
       </div>
     </main>
   );
