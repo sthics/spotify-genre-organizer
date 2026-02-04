@@ -365,3 +365,112 @@ func UnfollowPlaylist(accessToken, playlistID string) error {
 	return nil
 }
 
+// GetPlaylistTracks fetches all tracks from a playlist
+func GetPlaylistTracks(accessToken, playlistID string) ([]Song, error) {
+	var allTracks []Song
+	limit := 100
+	offset := 0
+
+	for {
+		url := fmt.Sprintf("%s/playlists/%s/tracks?limit=%d&offset=%d&fields=items(track(id,name,artists(id,name))),total",
+			APIURL, playlistID, limit, offset)
+
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+
+		client := &http.Client{Timeout: 30 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("failed to get playlist tracks: %d", resp.StatusCode)
+		}
+
+		var result struct {
+			Items []struct {
+				Track struct {
+					ID      string `json:"id"`
+					Name    string `json:"name"`
+					Artists []struct {
+						ID   string `json:"id"`
+						Name string `json:"name"`
+					} `json:"artists"`
+				} `json:"track"`
+			} `json:"items"`
+			Total int `json:"total"`
+		}
+
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			return nil, err
+		}
+
+		for _, item := range result.Items {
+			if item.Track.ID == "" {
+				continue // Skip local/unavailable tracks
+			}
+			artists := make([]Artist, len(item.Track.Artists))
+			for i, a := range item.Track.Artists {
+				artists[i] = Artist{ID: a.ID, Name: a.Name}
+			}
+			allTracks = append(allTracks, Song{
+				ID:      item.Track.ID,
+				Name:    item.Track.Name,
+				Artists: artists,
+			})
+		}
+
+		if len(result.Items) < limit || len(allTracks) >= result.Total {
+			break
+		}
+		offset += limit
+	}
+
+	return allTracks, nil
+}
+
+// RemoveTracksFromPlaylist removes tracks from a playlist
+func RemoveTracksFromPlaylist(accessToken, playlistID string, trackIDs []string) error {
+	// Spotify allows max 100 tracks per request
+	for i := 0; i < len(trackIDs); i += 100 {
+		end := i + 100
+		if end > len(trackIDs) {
+			end = len(trackIDs)
+		}
+		chunk := trackIDs[i:end]
+
+		tracks := make([]map[string]string, len(chunk))
+		for j, id := range chunk {
+			tracks[j] = map[string]string{"uri": "spotify:track:" + id}
+		}
+
+		body, _ := json.Marshal(map[string]any{"tracks": tracks})
+
+		req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/playlists/%s/tracks", APIURL, playlistID),
+			bytes.NewReader(body))
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		req.Header.Set("Content-Type", "application/json")
+
+		client := &http.Client{Timeout: 30 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			return err
+		}
+		resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("failed to remove tracks: %d", resp.StatusCode)
+		}
+	}
+
+	return nil
+}
+
