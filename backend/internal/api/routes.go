@@ -132,5 +132,13 @@ func SetupRoutes(r *gin.Engine) {
 
 		api.GET("/library/sync-status", handlers.GetSyncStatus)
 		api.POST("/playlists/sync-all", handlers.SyncAllPlaylists)
+
+		exclusions := api.Group("/exclusions")
+		{
+			exclusions.GET("", handlers.ListExclusions)
+			exclusions.POST("", handlers.CreateExclusion)
+			exclusions.POST("/:id/apply", handlers.ApplyExclusion)
+			exclusions.DELETE("/:id", handlers.DeleteExclusion)
+		}
 	}
 }
